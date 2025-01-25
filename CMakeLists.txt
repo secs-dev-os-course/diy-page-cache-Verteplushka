@@ -4,5 +4,6 @@ project(BlockCache)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-add_subdirectory(cache)
 add_subdirectory(app)
+add_subdirectory(cache)
+add_subdirectory(loader)
