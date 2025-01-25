@@ -28,6 +28,7 @@ private:
         off_t offset;
         std::vector<char> data;
         bool dirty;
+        int accessFrequency;
     };
 
     struct FileDescriptor {

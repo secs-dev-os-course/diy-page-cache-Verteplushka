@@ -16,7 +16,8 @@ int main() {
         ssize_t writeSize = cache.writeFile(fd, data, strlen(data));
         std::cout << "WriteFile returned size: " << writeSize << ", fd: " << fd << ", buffer: " << data << std::endl;
 
-        cache.syncFile(fd);
+        int syncedFile = cache.syncFile(fd);
+        std::cout << "SyncFile returned: " << syncedFile << std::endl;
         int closedFile = cache.closeFile(fd);
         std::cout << "CloseFile returned: " << closedFile << std::endl;
     } catch (const std::exception& ex) {

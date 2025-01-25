@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <windows.h>
+#include <algorithm>
 
 Cache::Cache(size_t blockSize, size_t maxBlocks)
     : blockSize(blockSize), maxBlocks(maxBlocks) {}
@@ -31,7 +32,7 @@ int Cache::openFile(const std::string& path) {
     if (fileHandle == INVALID_HANDLE_VALUE) {
         throw std::runtime_error("Failed to open file: " + path);
     }
-    int fd = reinterpret_cast<int>(fileHandle);  // Use intptr_t here
+    int fd = reinterpret_cast<int>(fileHandle);
     openFiles[fd] = {fd, path, 0};
     return fd;
 }
@@ -47,7 +48,7 @@ int Cache::closeFile(int fd) {
         }
     }
 
-    CloseHandle(reinterpret_cast<HANDLE>(fd));  // Reinterpret as HANDLE
+    CloseHandle(reinterpret_cast<HANDLE>(fd));
     openFiles.erase(it);
     cache.erase(fd);
     return 0;
@@ -64,15 +65,10 @@ ssize_t Cache::readFile(int fd, void* buf, size_t count) {
         off_t offset = openFiles[fd].filePos / blockSize * blockSize;
         CacheBlock* block = getOrCreateBlock(fd, offset);
 
+        block->accessFrequency++;
+
         size_t blockOffset = openFiles[fd].filePos % blockSize;
-        size_t bytesToCopy;
-        if((count - bytesRead) > (blockSize - blockOffset)){
-            bytesToCopy = blockSize - blockOffset;
-        } 
-        else{
-            bytesToCopy = count - bytesRead;
-        }
-        // size_t bytesToCopy = std::min(count - bytesRead, blockSize - blockOffset);
+        size_t bytesToCopy = (count - bytesRead) < (blockSize - blockOffset) ? (count - bytesRead) : (blockSize - blockOffset);
 
         memcpy(buffer + bytesRead, block->data.data() + blockOffset, bytesToCopy);
         openFiles[fd].filePos += bytesToCopy;
@@ -93,15 +89,11 @@ ssize_t Cache::writeFile(int fd, const void* buf, size_t count) {
         off_t offset = openFiles[fd].filePos / blockSize * blockSize;
         CacheBlock* block = getOrCreateBlock(fd, offset);
 
+        block->accessFrequency++;
+
         size_t blockOffset = openFiles[fd].filePos % blockSize;
-        size_t bytesToCopy;
-        if((count - bytesWritten) > (blockSize - blockOffset)){
-            bytesToCopy = blockSize - blockOffset;
-        } 
-        else{
-            bytesToCopy = count - bytesWritten;
-        }
-        // size_t bytesToCopy = std::min(count - bytesWritten, blockSize - blockOffset);
+        size_t bytesToCopy = (count - bytesWritten) < (blockSize - blockOffset) ? (count - bytesWritten) : (blockSize - blockOffset);
+
 
         memcpy(block->data.data() + blockOffset, buffer + bytesWritten, bytesToCopy);
         block->dirty = true;
@@ -147,7 +139,7 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
             evictBlock(fd);
         }
 
-        CacheBlock newBlock{offset, std::vector<char>(blockSize), false};
+        CacheBlock newBlock{offset, std::vector<char>(blockSize), false, 0};
         DWORD bytesRead;
         SetFilePointer(reinterpret_cast<HANDLE>(fd), offset, nullptr, FILE_BEGIN);
         ReadFile(reinterpret_cast<HANDLE>(fd), newBlock.data.data(), blockSize, &bytesRead, nullptr);
@@ -166,11 +158,17 @@ void Cache::flushBlock(int fd, CacheBlock& block) {
 
 void Cache::evictBlock(int fd) {
     auto& fileCache = cache[fd];
+
     if (!fileCache.empty()) {
-        auto it = fileCache.begin();
-        if (it->second.dirty) {
-            flushBlock(fd, it->second);
+        auto lfuBlockIt = std::min_element(fileCache.begin(), fileCache.end(),
+            [](const std::pair<off_t, CacheBlock>& a, const std::pair<off_t, CacheBlock>& b) {
+                return a.second.accessFrequency < b.second.accessFrequency;
+            });
+
+        if (lfuBlockIt->second.dirty) {
+            flushBlock(fd, lfuBlockIt->second);
         }
-        fileCache.erase(it);
+
+        fileCache.erase(lfuBlockIt);
     }
 }
