@@ -64,15 +64,34 @@ ssize_t Cache::readFile(int fd, void* buf, size_t count) {
     while (bytesRead < count) {
         off_t offset = openFiles[fd].filePos / blockSize * blockSize;
         CacheBlock* block = getOrCreateBlock(fd, offset);
+        if (!block) break; 
 
         block->accessFrequency++;
 
         size_t blockOffset = openFiles[fd].filePos % blockSize;
-        size_t bytesToCopy = (count - bytesRead) < (blockSize - blockOffset) ? (count - bytesRead) : (blockSize - blockOffset);
+        size_t availableInBlock = block->dataSize - blockOffset;
+
+        if(availableInBlock <= 0){
+            break;
+        }
+
+        size_t bytesToCopy = (count - bytesRead < availableInBlock) ? (count - bytesRead) : availableInBlock;
+
+        if (blockOffset + bytesToCopy > block->dataSize) {
+            bytesToCopy = block->dataSize - blockOffset;
+        }
 
         memcpy(buffer + bytesRead, block->data.data() + blockOffset, bytesToCopy);
         openFiles[fd].filePos += bytesToCopy;
         bytesRead += bytesToCopy;
+
+        if (bytesRead >= count) {
+            break;
+        }
+
+        if (bytesToCopy < availableInBlock) {
+            break;
+        }
     }
 
     return bytesRead;
@@ -140,9 +159,11 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
         }
 
         CacheBlock newBlock{offset, std::vector<char>(blockSize), false, 0};
-        DWORD bytesRead;
+        DWORD bytesRead = 0;
         SetFilePointer(reinterpret_cast<HANDLE>(fd), offset, nullptr, FILE_BEGIN);
         ReadFile(reinterpret_cast<HANDLE>(fd), newBlock.data.data(), blockSize, &bytesRead, nullptr);
+
+        newBlock.dataSize = bytesRead; // Устанавливаем реальный размер данных
         fileCache[offset] = std::move(newBlock);
     }
 

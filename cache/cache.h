@@ -27,6 +27,7 @@ private:
     struct CacheBlock {
         off_t offset;
         std::vector<char> data;
+        size_t dataSize = 0;
         bool dirty;
         int accessFrequency;
     };

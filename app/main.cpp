@@ -12,6 +12,10 @@ int main() {
         ssize_t readSize = cache.readFile(fd, buffer, sizeof(buffer));
         std::cout << "ReadFile returned size: " << readSize << ", fd: " << fd << ", buffer: " << buffer << std::endl;
 
+        char buffer2[128] = {0};
+        ssize_t readSize2 = cache.readFile(fd, buffer2, sizeof(buffer2));
+        std::cout << "ReadFile returned size: " << readSize2 << ", fd: " << fd << ", buffer: " << buffer2 << std::endl;
+
         const char* data = "Hello, world!";
         ssize_t writeSize = cache.writeFile(fd, data, strlen(data));
         std::cout << "WriteFile returned size: " << writeSize << ", fd: " << fd << ", buffer: " << data << std::endl;
