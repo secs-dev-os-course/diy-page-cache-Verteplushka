@@ -1,4 +1,4 @@
-#include "EmaSearchString.hpp"
+#include "ema_search_string_cache.hpp"
 #include <iostream>
 
 int main(int argc, char* argv[]) {
@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
     }
 
     int repetitions = std::stoi(argv[1]);
-    ema_search_str(repetitions, "../data/little_data.txt");
+    ema_search_str_cache(repetitions, "../data/little_data.txt");
 
     return 0;
 }

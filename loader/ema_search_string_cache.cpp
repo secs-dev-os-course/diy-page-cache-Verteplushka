@@ -1,16 +1,21 @@
-#include "EmaSearchString.hpp"
+#include "ema_search_string_cache.hpp"
+#include "../cache/cache.h"
 #include <iostream>
-#include <fstream>
 #include <chrono>
 #include <vector>
 #include <cstring>
 
-constexpr std::size_t CHUNK_SIZE = 32 * 1024 * 1024;
 
-void ema_search_str(int repetitions, std::string filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Error opening file!" << std::endl;
+constexpr std::size_t CHUNK_SIZE = 16 * 1024;
+
+void ema_search_str_cache(int repetitions, const std::string filename) {
+    Cache cache(1024, 128);
+    HANDLE fd = 0;
+
+    try {
+        fd = cache.openFile(filename);
+    } catch (const std::exception& ex) {
+        std::cerr << "Error opening file: " << ex.what() << std::endl;
         return;
     }
 
@@ -21,18 +26,15 @@ void ema_search_str(int repetitions, std::string filename) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
     for (int r = 0; r < repetitions; ++r) {
-        file.clear();
-        file.seekg(0, std::ios::beg);
-
         std::vector<char> buffer(CHUNK_SIZE + target_size - 1);
-
         std::string leftover;
-        while (!file.eof()) {
-            file.read(buffer.data() + leftover.size(), CHUNK_SIZE);
-            std::streamsize bytes_read = file.gcount();
+
+        while (true) {
+            ssize_t bytes_read = cache.readFile(fd, buffer.data() + leftover.size(), CHUNK_SIZE);
+
+            if (bytes_read <= 0) break;
 
             std::memcpy(buffer.data(), leftover.data(), leftover.size());
-
             std::size_t total_size = leftover.size() + bytes_read;
 
             for (std::size_t i = 0; i + target_size <= total_size; ++i) {
@@ -47,7 +49,11 @@ void ema_search_str(int repetitions, std::string filename) {
                 leftover.assign(buffer.data(), total_size);
             }
         }
+
+        cache.seekFile(fd, 0, SEEK_SET);
     }
+
+    cache.closeFile(fd);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end_time - start_time;
