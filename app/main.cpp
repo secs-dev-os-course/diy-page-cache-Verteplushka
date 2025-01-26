@@ -6,7 +6,7 @@ int main() {
     Cache cache(4096, 10); // Блок 4KB, максимум 10 блоков в кэше
 
     try {
-        int fd = cache.openFile("../data/text.txt");
+        HANDLE fd = cache.openFile("../data/text.txt");
         std::cout << "OpenFile returned: " << fd << std::endl;
         char buffer[128] = {0};
 

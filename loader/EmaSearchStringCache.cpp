@@ -5,11 +5,12 @@
 #include <vector>
 #include <cstring>
 
+
 constexpr std::size_t CHUNK_SIZE = 16 * 1024;
 
 void ema_search_str_cache(int repetitions, const std::string filename) {
     Cache cache(1024, 128);
-    int fd = -1;
+    HANDLE fd = 0;
 
     try {
         fd = cache.openFile(filename);

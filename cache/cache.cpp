@@ -18,7 +18,7 @@ Cache::~Cache() {
     }
 }
 
-int Cache::openFile(const std::string& path) {
+HANDLE Cache::openFile(const std::string& path) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     HANDLE fileHandle = CreateFileA(
         path.c_str(), 
@@ -32,12 +32,11 @@ int Cache::openFile(const std::string& path) {
     if (fileHandle == INVALID_HANDLE_VALUE) {
         throw std::runtime_error("Failed to open file: " + path);
     }
-    int fd = reinterpret_cast<int>(fileHandle);
-    openFiles[fd] = {fd, path, 0};
-    return fd;
+    openFiles[fileHandle] = {fileHandle, path, 0};
+    return fileHandle;
 }
 
-int Cache::closeFile(int fd) {
+int Cache::closeFile(HANDLE fd) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     auto it = openFiles.find(fd);
     if (it == openFiles.end()) return -1;
@@ -48,13 +47,13 @@ int Cache::closeFile(int fd) {
         }
     }
 
-    CloseHandle(reinterpret_cast<HANDLE>(fd));
+    CloseHandle(fd);
     openFiles.erase(it);
     cache.erase(fd);
     return 0;
 }
 
-ssize_t Cache::readFile(int fd, void* buf, size_t count) {
+ssize_t Cache::readFile(HANDLE fd, void* buf, size_t count) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     if (openFiles.find(fd) == openFiles.end()) return -1;
 
@@ -97,7 +96,7 @@ ssize_t Cache::readFile(int fd, void* buf, size_t count) {
     return bytesRead;
 }
 
-ssize_t Cache::writeFile(int fd, const void* buf, size_t count) {
+ssize_t Cache::writeFile(HANDLE fd, const void* buf, size_t count) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     if (openFiles.find(fd) == openFiles.end()) return -1;
 
@@ -123,7 +122,7 @@ ssize_t Cache::writeFile(int fd, const void* buf, size_t count) {
     return bytesWritten;
 }
 
-off_t Cache::seekFile(int fd, off_t offset, int whence) {
+off_t Cache::seekFile(HANDLE fd, off_t offset, int whence) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     if (openFiles.find(fd) == openFiles.end()) return -1;
 
@@ -139,7 +138,7 @@ off_t Cache::seekFile(int fd, off_t offset, int whence) {
     return openFiles[fd].filePos;
 }
 
-int Cache::syncFile(int fd) {
+int Cache::syncFile(HANDLE fd) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     if (openFiles.find(fd) == openFiles.end()) return -1;
 
@@ -151,7 +150,7 @@ int Cache::syncFile(int fd) {
     return 0;
 }
 
-Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
+Cache::CacheBlock* Cache::getOrCreateBlock(HANDLE fd, off_t offset) {
     auto& fileCache = cache[fd];
     if (fileCache.find(offset) == fileCache.end()) {
         if (fileCache.size() >= maxBlocks) {
@@ -160,8 +159,8 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
 
         CacheBlock newBlock{offset, std::vector<char>(blockSize), false, 0};
         DWORD bytesRead = 0;
-        SetFilePointer(reinterpret_cast<HANDLE>(fd), offset, nullptr, FILE_BEGIN);
-        ReadFile(reinterpret_cast<HANDLE>(fd), newBlock.data.data(), blockSize, &bytesRead, nullptr);
+        SetFilePointer(fd, offset, nullptr, FILE_BEGIN);
+        ReadFile(fd, newBlock.data.data(), blockSize, &bytesRead, nullptr);
 
         newBlock.dataSize = bytesRead;
         fileCache[offset] = std::move(newBlock);
@@ -170,15 +169,15 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
     return &fileCache[offset];
 }
 
-void Cache::flushBlock(int fd, CacheBlock& block) {
-    SetFilePointer(reinterpret_cast<HANDLE>(fd), block.offset, nullptr, FILE_BEGIN);
+void Cache::flushBlock(HANDLE fd, CacheBlock& block) {
+    SetFilePointer(fd, block.offset, nullptr, FILE_BEGIN);
     DWORD bytesWritten;
     size_t blockOffset = openFiles[fd].filePos % blockSize;
-    WriteFile(reinterpret_cast<HANDLE>(fd), block.data.data(), blockOffset, &bytesWritten, nullptr);
+    WriteFile(fd, block.data.data(), blockOffset, &bytesWritten, nullptr);
     block.dirty = false;
 }
 
-void Cache::evictBlock(int fd) {
+void Cache::evictBlock(HANDLE fd) {
     auto& fileCache = cache[fd];
 
     if (!fileCache.empty()) {

@@ -10,18 +10,19 @@ typedef SSIZE_T ssize_t;
 #include <vector>
 #include <mutex>
 #include <string>
+#include <windows.h>
 
 class Cache {
 public:
     Cache(size_t blockSize, size_t maxBlocks);
     ~Cache();
 
-    int openFile(const std::string& path);
-    int closeFile(int fd);
-    ssize_t readFile(int fd, void* buf, size_t count);
-    ssize_t writeFile(int fd, const void* buf, size_t count);
-    off_t seekFile(int fd, off_t offset, int whence);
-    int syncFile(int fd);
+    HANDLE openFile(const std::string& path);
+    int closeFile(HANDLE fd);
+    ssize_t readFile(HANDLE fd, void* buf, size_t count);
+    ssize_t writeFile(HANDLE fd, const void* buf, size_t count);
+    off_t seekFile(HANDLE fd, off_t offset, int whence);
+    int syncFile(HANDLE fd);
 
 private:
     struct CacheBlock {
@@ -33,20 +34,20 @@ private:
     };
 
     struct FileDescriptor {
-        int fd;
+        HANDLE fd;
         std::string path;
         off_t filePos;
     };
 
     size_t blockSize;
     size_t maxBlocks;
-    std::map<int, std::map<off_t, CacheBlock>> cache;
-    std::map<int, FileDescriptor> openFiles;
+    std::map<HANDLE, std::map<off_t, CacheBlock>> cache;
+    std::map<HANDLE, FileDescriptor> openFiles;
     std::mutex cacheMutex;
 
-    CacheBlock* getOrCreateBlock(int fd, off_t offset);
-    void flushBlock(int fd, CacheBlock& block);
-    void evictBlock(int fd);
+    CacheBlock* getOrCreateBlock(HANDLE fd, off_t offset);
+    void flushBlock(HANDLE fd, CacheBlock& block);
+    void evictBlock(HANDLE fd);
 };
 
 #endif
