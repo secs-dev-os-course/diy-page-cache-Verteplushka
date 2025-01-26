@@ -5,10 +5,10 @@
 #include <vector>
 #include <cstring>
 
-constexpr std::size_t CHUNK_SIZE = 32 * 1024 * 1024;
+constexpr std::size_t CHUNK_SIZE = 16 * 1024;
 
 void ema_search_str_cache(int repetitions, const std::string filename) {
-    Cache cache(4096, 10);
+    Cache cache(1024, 128);
     int fd = -1;
 
     try {

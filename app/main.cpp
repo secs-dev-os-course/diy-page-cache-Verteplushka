@@ -1,4 +1,5 @@
 #include <iostream>
+#include <windows.h>
 #include "cache.h"
 
 int main() {
@@ -20,13 +21,12 @@ int main() {
         ssize_t writeSize = cache.writeFile(fd, data, strlen(data));
         std::cout << "WriteFile returned size: " << writeSize << ", fd: " << fd << ", buffer: " << data << std::endl;
 
-        ssize_t writeSize2 = cache.writeFile(fd, data, strlen(data));
-        std::cout << "WriteFile returned size: " << writeSize2 << ", fd: " << fd << ", buffer: " << data << std::endl;
+        const char* data2 = "Hello, Petua!";
+        ssize_t writeSize2 = cache.writeFile(fd, data2, strlen(data2));
+        std::cout << "WriteFile returned size: " << writeSize2 << ", fd: " << fd << ", buffer: " << data2 << std::endl;
 
-
-        // int syncedFile = cache.syncFile(fd);
-        // std::cout << "SyncFile returned: " << syncedFile << std::endl;
         int closedFile = cache.closeFile(fd);
+
         std::cout << "CloseFile returned: " << closedFile << std::endl;
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << std::endl;
