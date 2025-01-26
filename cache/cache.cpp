@@ -113,9 +113,9 @@ ssize_t Cache::writeFile(int fd, const void* buf, size_t count) {
         size_t blockOffset = openFiles[fd].filePos % blockSize;
         size_t bytesToCopy = (count - bytesWritten) < (blockSize - blockOffset) ? (count - bytesWritten) : (blockSize - blockOffset);
 
-
         memcpy(block->data.data() + blockOffset, buffer + bytesWritten, bytesToCopy);
         block->dirty = true;
+
         openFiles[fd].filePos += bytesToCopy;
         bytesWritten += bytesToCopy;
     }
@@ -163,7 +163,7 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
         SetFilePointer(reinterpret_cast<HANDLE>(fd), offset, nullptr, FILE_BEGIN);
         ReadFile(reinterpret_cast<HANDLE>(fd), newBlock.data.data(), blockSize, &bytesRead, nullptr);
 
-        newBlock.dataSize = bytesRead; // Устанавливаем реальный размер данных
+        newBlock.dataSize = bytesRead;
         fileCache[offset] = std::move(newBlock);
     }
 
@@ -173,7 +173,8 @@ Cache::CacheBlock* Cache::getOrCreateBlock(int fd, off_t offset) {
 void Cache::flushBlock(int fd, CacheBlock& block) {
     SetFilePointer(reinterpret_cast<HANDLE>(fd), block.offset, nullptr, FILE_BEGIN);
     DWORD bytesWritten;
-    WriteFile(reinterpret_cast<HANDLE>(fd), block.data.data(), blockSize, &bytesWritten, nullptr);
+    size_t blockOffset = openFiles[fd].filePos % blockSize;
+    WriteFile(reinterpret_cast<HANDLE>(fd), block.data.data(), blockOffset, &bytesWritten, nullptr);
     block.dirty = false;
 }
 

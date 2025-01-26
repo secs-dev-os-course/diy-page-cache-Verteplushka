@@ -16,12 +16,16 @@ int main() {
         ssize_t readSize2 = cache.readFile(fd, buffer2, sizeof(buffer2));
         std::cout << "ReadFile returned size: " << readSize2 << ", fd: " << fd << ", buffer: " << buffer2 << std::endl;
 
-        const char* data = "Hello, world!";
+        const char* data = "Hello, Viktor!";
         ssize_t writeSize = cache.writeFile(fd, data, strlen(data));
         std::cout << "WriteFile returned size: " << writeSize << ", fd: " << fd << ", buffer: " << data << std::endl;
 
-        int syncedFile = cache.syncFile(fd);
-        std::cout << "SyncFile returned: " << syncedFile << std::endl;
+        ssize_t writeSize2 = cache.writeFile(fd, data, strlen(data));
+        std::cout << "WriteFile returned size: " << writeSize2 << ", fd: " << fd << ", buffer: " << data << std::endl;
+
+
+        // int syncedFile = cache.syncFile(fd);
+        // std::cout << "SyncFile returned: " << syncedFile << std::endl;
         int closedFile = cache.closeFile(fd);
         std::cout << "CloseFile returned: " << closedFile << std::endl;
     } catch (const std::exception& ex) {
