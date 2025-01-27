@@ -116,6 +116,9 @@ ssize_t Cache::writeFile(HANDLE fd, const void* buf, size_t count) {
         block->dirty = true;
 
         openFiles[fd].filePos += bytesToCopy;
+        if(block->dataSize < openFiles[fd].filePos){
+            block->dataSize = openFiles[fd].filePos;
+        }
         bytesWritten += bytesToCopy;
     }
 
@@ -124,19 +127,41 @@ ssize_t Cache::writeFile(HANDLE fd, const void* buf, size_t count) {
 
 off_t Cache::seekFile(HANDLE fd, off_t offset, int whence) {
     std::lock_guard<std::mutex> lock(cacheMutex);
+
     if (openFiles.find(fd) == openFiles.end()) return -1;
 
+    FileDescriptor& fileDesc = openFiles[fd];
+    LARGE_INTEGER move, newPointer;
+
+    move.QuadPart = offset;
+
     if (whence == SEEK_SET) {
-        openFiles[fd].filePos = offset;
+        fileDesc.filePos = offset;
     } else if (whence == SEEK_CUR) {
-        openFiles[fd].filePos += offset;
+        fileDesc.filePos += offset;
     } else if (whence == SEEK_END) {
-        throw std::runtime_error("SEEK_END is not supported.");
+        LARGE_INTEGER fileSize;
+        if (!GetFileSizeEx(fd, &fileSize)) {
+            return -1;
+        }
+        fileDesc.filePos = fileSize.QuadPart + offset;
     } else {
         return -1;
     }
-    return openFiles[fd].filePos;
+
+    if (fileDesc.filePos < 0) {
+        fileDesc.filePos = 0;
+        return -1;
+    }
+
+    // move.QuadPart = fileDesc.filePos;
+    // if (!SetFilePointerEx(fd, move, &newPointer, FILE_BEGIN)) {
+    //     return -1;
+    // }
+
+    return fileDesc.filePos;
 }
+
 
 int Cache::syncFile(HANDLE fd) {
     std::lock_guard<std::mutex> lock(cacheMutex);
@@ -172,7 +197,8 @@ Cache::CacheBlock* Cache::getOrCreateBlock(HANDLE fd, off_t offset) {
 void Cache::flushBlock(HANDLE fd, CacheBlock& block) {
     SetFilePointer(fd, block.offset, nullptr, FILE_BEGIN);
     DWORD bytesWritten;
-    size_t blockOffset = openFiles[fd].filePos % blockSize;
+    // size_t blockOffset = openFiles[fd].filePos % blockSize;
+    size_t blockOffset = block.dataSize;
     WriteFile(fd, block.data.data(), blockOffset, &bytesWritten, nullptr);
     block.dirty = false;
 }
