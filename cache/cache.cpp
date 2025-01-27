@@ -20,13 +20,14 @@ Cache::~Cache() {
 
 HANDLE Cache::openFile(const std::string& path) {
     std::lock_guard<std::mutex> lock(cacheMutex);
-    HANDLE fileHandle = CreateFileA(
+    HANDLE fileHandle = CreateFile(
         path.c_str(), 
         GENERIC_READ | GENERIC_WRITE, 
-        0, 
+        0,
         nullptr, 
         OPEN_EXISTING, 
-        FILE_ATTRIBUTE_NORMAL, 
+        FILE_ATTRIBUTE_NORMAL |
+        FILE_FLAG_WRITE_THROUGH, 
         nullptr
     );
     if (fileHandle == INVALID_HANDLE_VALUE) {
@@ -63,34 +64,25 @@ ssize_t Cache::readFile(HANDLE fd, void* buf, size_t count) {
     while (bytesRead < count) {
         off_t offset = openFiles[fd].filePos / blockSize * blockSize;
         CacheBlock* block = getOrCreateBlock(fd, offset);
-        if (!block) break; 
+        if (!block || block->dataSize == 0) break;
 
         block->accessFrequency++;
 
         size_t blockOffset = openFiles[fd].filePos % blockSize;
         size_t availableInBlock = block->dataSize - blockOffset;
 
-        if(availableInBlock <= 0){
-            break;
-        }
+        if (availableInBlock <= 0) break;
 
-        size_t bytesToCopy = (count - bytesRead < availableInBlock) ? (count - bytesRead) : availableInBlock;
-
-        if (blockOffset + bytesToCopy > block->dataSize) {
-            bytesToCopy = block->dataSize - blockOffset;
-        }
+        size_t bytesToCopy = (count - bytesRead < availableInBlock) 
+                             ? (count - bytesRead) 
+                             : availableInBlock;
 
         memcpy(buffer + bytesRead, block->data.data() + blockOffset, bytesToCopy);
+
         openFiles[fd].filePos += bytesToCopy;
         bytesRead += bytesToCopy;
 
-        if (bytesRead >= count) {
-            break;
-        }
-
-        if (bytesToCopy < availableInBlock) {
-            break;
-        }
+        if (bytesRead >= count) break;
     }
 
     return bytesRead;
@@ -106,20 +98,24 @@ ssize_t Cache::writeFile(HANDLE fd, const void* buf, size_t count) {
     while (bytesWritten < count) {
         off_t offset = openFiles[fd].filePos / blockSize * blockSize;
         CacheBlock* block = getOrCreateBlock(fd, offset);
+        if (!block) break;
 
         block->accessFrequency++;
 
         size_t blockOffset = openFiles[fd].filePos % blockSize;
-        size_t bytesToCopy = (count - bytesWritten) < (blockSize - blockOffset) ? (count - bytesWritten) : (blockSize - blockOffset);
+        size_t bytesToCopy = (count - bytesWritten < blockSize - blockOffset) 
+                             ? (count - bytesWritten) 
+                             : (blockSize - blockOffset);
 
         memcpy(block->data.data() + blockOffset, buffer + bytesWritten, bytesToCopy);
         block->dirty = true;
 
         openFiles[fd].filePos += bytesToCopy;
-        if(block->dataSize < openFiles[fd].filePos){
-            block->dataSize = openFiles[fd].filePos;
-        }
         bytesWritten += bytesToCopy;
+
+        if (block->dataSize < blockOffset + bytesToCopy) {
+            block->dataSize = blockOffset + bytesToCopy;
+        }
     }
 
     return bytesWritten;
@@ -153,11 +149,6 @@ off_t Cache::seekFile(HANDLE fd, off_t offset, int whence) {
         fileDesc.filePos = 0;
         return -1;
     }
-
-    // move.QuadPart = fileDesc.filePos;
-    // if (!SetFilePointerEx(fd, move, &newPointer, FILE_BEGIN)) {
-    //     return -1;
-    // }
 
     return fileDesc.filePos;
 }
@@ -197,7 +188,6 @@ Cache::CacheBlock* Cache::getOrCreateBlock(HANDLE fd, off_t offset) {
 void Cache::flushBlock(HANDLE fd, CacheBlock& block) {
     SetFilePointer(fd, block.offset, nullptr, FILE_BEGIN);
     DWORD bytesWritten;
-    // size_t blockOffset = openFiles[fd].filePos % blockSize;
     size_t blockOffset = block.dataSize;
     WriteFile(fd, block.data.data(), blockOffset, &bytesWritten, nullptr);
     block.dirty = false;

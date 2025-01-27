@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstring>
 
-constexpr std::size_t CHUNK_SIZE = 32 * 1024 * 1024;
+constexpr std::size_t CHUNK_SIZE = 16 * 1024;
 
 void ema_search_str(int repetitions, std::string filename) {
     std::ifstream file(filename, std::ios::binary);

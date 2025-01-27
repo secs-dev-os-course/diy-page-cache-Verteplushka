@@ -9,7 +9,7 @@
 constexpr std::size_t CHUNK_SIZE = 16 * 1024;
 
 void ema_search_str_cache(int repetitions, const std::string filename) {
-    Cache cache(1024, 128);
+    Cache cache(16 * 1024, 150);
     HANDLE fd = 0;
 
     try {
