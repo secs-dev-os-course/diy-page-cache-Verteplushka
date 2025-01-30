@@ -1,15 +1,9 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.16)
+project(BlockCache)
 
-project(my-project
-        VERSION 0.0.0
-        DESCRIPTION "My best project"
-        LANGUAGES C CXX
-)
-
-set(CMAKE_C_STANDARD 23)
-set(CMAKE_C_STANDARD_REQUIRED True)
-
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_subdirectory(app)
+add_subdirectory(cache)
+add_subdirectory(loader)

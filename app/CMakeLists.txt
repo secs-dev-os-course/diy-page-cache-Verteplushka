@@ -1,16 +1,9 @@
-cmake_minimum_required(VERSION 3.12)
-project(app
-        VERSION 0.0.0
-        DESCRIPTION "Application module"
-        LANGUAGES C CXX
-)
+add_executable(app main.cpp)
+target_link_libraries(app cache)
+target_include_directories(app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../cache)
 
-cmake_policy(SET CMP0076 NEW) # avoid warning of relative paths translation
 
-add_executable(app)
-target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR})
-
-target_sources(app
-        PRIVATE
-        app.c # or app.cpp
+add_custom_command(TARGET app POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/cache/Debug/cache.dll ${CMAKE_BINARY_DIR}/app/Debug/cache.dll
+    COMMENT "Moving cache.dll to app/Debug"
 )
